@@ -2,30 +2,54 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Library.Domain;
+using Library.MVC.Data;
+using Library.MVC.Views;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using Library.Domain;
-using Library.MVC.Data;
 
 namespace Library.MVC.Controllers
 {
-    public class CustomersController : Controller
+    public class BooksController : Controller
     {
         private readonly ApplicationDbContext _context;
 
-        public CustomersController(ApplicationDbContext context)
+        public BooksController(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        // GET: Customers
-        public async Task<IActionResult> Index()
+        // GET: Books
+        public async Task<IActionResult> Index(string? searchTerm, string? category, string? availability)
         {
-            return View(await _context.Customers.ToListAsync());
+            IQueryable<Book> q = _context.Books;
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+                q = q.Where(b => b.Title.Contains(searchTerm) || b.Author.Contains(searchTerm));
+
+            if (!string.IsNullOrWhiteSpace(category))
+                q = q.Where(b => b.Category == category);
+
+            if (availability == "available")
+                q = q.Where(b => b.IsAvailable);
+            else if (availability == "onloan")
+                q = q.Where(b => !b.IsAvailable);
+
+            var cats = await _context.Books
+                .Select(b => b.Category).Distinct().OrderBy(c => c).ToListAsync();
+
+            return View(new BookFilterViewModel
+            {
+                Books = await q.OrderBy(b => b.Title).ToListAsync(),
+                SearchTerm = searchTerm,
+                Category = category,
+                Availability = availability,
+                Categories = new SelectList(cats)
+            });
         }
 
-        // GET: Customers/Details/5
+        // GET: Books/Details/5
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -33,39 +57,39 @@ namespace Library.MVC.Controllers
                 return NotFound();
             }
 
-            var customer = await _context.Customers
+            var book = await _context.Books
                 .FirstOrDefaultAsync(m => m.Id == id);
-            if (customer == null)
+            if (book == null)
             {
                 return NotFound();
             }
 
-            return View(customer);
+            return View(book);
         }
 
-        // GET: Customers/Create
+        // GET: Books/Create
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Customers/Create
+        // POST: Books/Create
         // To protect from overposting attacks, enable the specific properties you want to bind to.
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Name")] Customer customer)
+        public async Task<IActionResult> Create([Bind("Id,Title,Author,Isbn,Category,IsAvailable")] Book book)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(customer);
+                _context.Add(book);
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            return View(customer);
+            return View(book);
         }
 
-        // GET: Customers/Edit/5
+        // GET: Books/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -73,22 +97,22 @@ namespace Library.MVC.Controllers
                 return NotFound();
             }
 
-            var customer = await _context.Customers.FindAsync(id);
-            if (customer == null)
+            var book = await _context.Books.FindAsync(id);
+            if (book == null)
             {
                 return NotFound();
             }
-            return View(customer);
+            return View(book);
         }
 
-        // POST: Customers/Edit/5
+        // POST: Books/Edit/5
         // To protect from overposting attacks, enable the specific properties you want to bind to.
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Name")] Customer customer)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Title,Author,Isbn,Category,IsAvailable")] Book book)
         {
-            if (id != customer.Id)
+            if (id != book.Id)
             {
                 return NotFound();
             }
@@ -97,12 +121,12 @@ namespace Library.MVC.Controllers
             {
                 try
                 {
-                    _context.Update(customer);
+                    _context.Update(book);
                     await _context.SaveChangesAsync();
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    if (!CustomerExists(customer.Id))
+                    if (!BookExists(book.Id))
                     {
                         return NotFound();
                     }
@@ -113,10 +137,10 @@ namespace Library.MVC.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-            return View(customer);
+            return View(book);
         }
 
-        // GET: Customers/Delete/5
+        // GET: Books/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -124,34 +148,40 @@ namespace Library.MVC.Controllers
                 return NotFound();
             }
 
-            var customer = await _context.Customers
+            var book = await _context.Books
                 .FirstOrDefaultAsync(m => m.Id == id);
-            if (customer == null)
+            if (book == null)
             {
                 return NotFound();
             }
 
-            return View(customer);
+            return View(book);
         }
 
-        // POST: Customers/Delete/5
+        // POST: Books/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var customer = await _context.Customers.FindAsync(id);
-            if (customer != null)
+            var book = await _context.Books
+                .Include(b => b.Loans)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (book == null) return NotFound();
+
+            if (book.Loans.Any())
             {
-                _context.Customers.Remove(customer);
+                TempData["Error"] = "Impossible de supprimer ce livre car il a des prêts associés.";
+                return RedirectToAction(nameof(Index));
             }
 
+            _context.Books.Remove(book);
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
-
-        private bool CustomerExists(int id)
+        private bool BookExists(int id)
         {
-            return _context.Customers.Any(e => e.Id == id);
+            return _context.Books.Any(e => e.Id == id);
         }
     }
 }

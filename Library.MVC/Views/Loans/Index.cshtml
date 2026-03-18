@@ -1,0 +1,57 @@
+﻿@model IEnumerable<Library.Domain.Loan>
+@{
+    ViewData["Title"] = "Loans";
+}
+<h1>Loans</h1>
+<p>
+    <a asp-action="Create" class="btn btn-success">+ New Loan</a>
+</p>
+<table class="table table-hover">
+    <thead class="table-dark">
+        <tr>
+            <th>Book</th>
+            <th>Member</th>
+            <th>Loan Date</th>
+            <th>Due Date</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var overdue = item.ReturnedDate is null && item.DueDate < DateTime.Today;
+            <tr class="@(overdue ? "table-danger" : "")">
+                <td>@item.Book.Title</td>
+                <td>@item.Member.FullName</td>
+                <td>@item.LoanDate.ToShortDateString()</td>
+                <td>@item.DueDate.ToShortDateString()</td>
+                <td>
+                    @if (item.ReturnedDate.HasValue)
+                    {
+                        <span class="badge bg-success">Returned on @item.ReturnedDate.Value.ToShortDateString()</span>
+                    }
+                    else if (overdue)
+                    {
+                        <span class="badge bg-danger">OVERDUE</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning text-dark">Active</span>
+                    }
+                </td>
+                <td>
+                    @if (item.ReturnedDate is null)
+                    {
+                        <form asp-action="MarkReturned" asp-route-id="@item.Id" method="post" style="display:inline">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-sm btn-success">Mark as Returned</button>
+                        </form>
+                    }
+                    <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-info">Details</a>
+                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">Delete</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

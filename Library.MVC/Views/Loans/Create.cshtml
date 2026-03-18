@@ -1,0 +1,38 @@
+﻿@model Library.Domain.Loan
+@{
+    ViewData["Title"] = "Nouveau prêt";
+}
+<h1>Nouveau prêt</h1>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Create">
+            <div asp-validation-summary="All" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="BookId" class="control-label">Livre (disponibles uniquement)</label>
+                <select asp-for="BookId" class="form-control" asp-items="ViewBag.BookId"></select>
+            </div>
+            <div class="form-group">
+                <label asp-for="MemberId" class="control-label">Membre</label>
+                <select asp-for="MemberId" class="form-control" asp-items="ViewBag.MemberId"></select>
+            </div>
+            <div class="form-group">
+                <label asp-for="DueDate" class="control-label">Date de retour prévue</label>
+                <input asp-for="DueDate" type="date" class="form-control"
+                       value="@DateTime.Today.AddDays(14).ToString("yyyy-MM-dd")" />
+                <span asp-validation-for="DueDate" class="text-danger"></span>
+            </div>
+            <div class="form-group mt-3">
+                <input type="submit" value="Créer le prêt" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+<div>
+    <a asp-action="Index">Retour à la liste</a>
+</div>
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
